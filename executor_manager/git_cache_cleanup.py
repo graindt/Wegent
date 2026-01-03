@@ -58,13 +58,17 @@ class GitCacheCleanupManager:
         if not protected_str:
             return set()
 
-        try:
-            protected_ids = [int(uid.strip()) for uid in protected_str.split(",")]
+        protected_ids = set()
+        for uid in protected_str.split(","):
+            try:
+                protected_ids.add(int(uid.strip()))
+            except ValueError as e:
+                logger.warning(f"Invalid GIT_CACHE_PROTECTED_USERS value: {e}")
+                continue
+
+        if protected_ids:
             logger.info(f"Protected users: {protected_ids}")
-            return set(protected_ids)
-        except ValueError as e:
-            logger.warning(f"Invalid GIT_CACHE_PROTECTED_USERS value: {e}")
-            return set()
+        return protected_ids
 
     def cleanup_inactive_volumes(self) -> Dict[str, Any]:
         """
@@ -80,10 +84,7 @@ class GitCacheCleanupManager:
             }
         """
         from executor_manager.executors.docker.git_cache_volume_manager import (
-            list_user_volumes,
-            delete_volume,
-            get_volume_size,
-        )
+            delete_volume, get_volume_size, list_user_volumes)
 
         if not self.enabled:
             logger.info("Git cache cleanup is disabled, skipping")
@@ -94,7 +95,9 @@ class GitCacheCleanupManager:
                 "errors": [],
             }
 
-        logger.info(f"Starting cleanup of volumes inactive for {self.inactive_days}+ days")
+        logger.info(
+            f"Starting cleanup of volumes inactive for {self.inactive_days}+ days"
+        )
 
         deleted_volumes = []
         protected_volumes = []
@@ -113,7 +116,9 @@ class GitCacheCleanupManager:
 
             # Check if user is protected
             if user_id in self.protected_users:
-                logger.info(f"Volume {volume_name} is protected (user {user_id}), skipping")
+                logger.info(
+                    f"Volume {volume_name} is protected (user {user_id}), skipping"
+                )
                 protected_volumes.append(volume_name)
                 continue
 
@@ -127,7 +132,9 @@ class GitCacheCleanupManager:
                     if created_at_str:
                         last_used = datetime.fromisoformat(created_at_str)
                     else:
-                        logger.warning(f"Volume {volume_name} has no date labels, skipping")
+                        logger.warning(
+                            f"Volume {volume_name} has no date labels, skipping"
+                        )
                         continue
             except ValueError as e:
                 logger.warning(f"Invalid date format for volume {volume_name}: {e}")
@@ -144,14 +151,18 @@ class GitCacheCleanupManager:
                 size = get_volume_size(volume_name)
 
                 if self.dry_run:
-                    logger.info(f"DRY RUN: Would delete volume {volume_name} ({size} bytes)")
+                    logger.info(
+                        f"DRY RUN: Would delete volume {volume_name} ({size} bytes)"
+                    )
                     deleted_volumes.append(volume_name)
                     total_freed_space += size or 0
                 else:
                     # Actually delete the volume
                     success, error_msg = delete_volume(volume_name)
                     if success:
-                        logger.info(f"Deleted volume {volume_name} ({size} bytes freed)")
+                        logger.info(
+                            f"Deleted volume {volume_name} ({size} bytes freed)"
+                        )
                         deleted_volumes.append(volume_name)
                         total_freed_space += size or 0
                     else:
@@ -159,7 +170,9 @@ class GitCacheCleanupManager:
                         logger.error(error)
                         errors.append(error)
             else:
-                logger.debug(f"Volume {volume_name} is still active (last used: {last_used.isoformat()})")
+                logger.debug(
+                    f"Volume {volume_name} is still active (last used: {last_used.isoformat()})"
+                )
 
         result = {
             "deleted_volumes": deleted_volumes,
@@ -188,9 +201,7 @@ class GitCacheCleanupManager:
             - inactive_threshold_days: Configured inactive days threshold
         """
         from executor_manager.executors.docker.git_cache_volume_manager import (
-            list_user_volumes,
-            get_volume_size,
-        )
+            get_volume_size, list_user_volumes)
 
         user_volumes = list_user_volumes()
 

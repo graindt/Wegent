@@ -2,20 +2,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
+
+import pytest
 from executor_manager.executors.docker.git_cache_volume_manager import (
-    get_user_volume_name,
-    volume_exists,
-    create_user_volume,
-    get_volume_metadata,
-    update_volume_last_used,
-    delete_volume,
-    list_user_volumes,
-    get_volume_size,
-    get_all_user_volume_names,
-)
+    create_user_volume, delete_volume, get_all_user_volume_names,
+    get_user_volume_name, get_volume_metadata, get_volume_size,
+    list_user_volumes, update_volume_last_used, volume_exists)
 
 
 class TestVolumeManager:
@@ -45,7 +39,9 @@ class TestVolumeManager:
     def test_create_user_volume_success(self, mock_run, mock_exists):
         """Test successful volume creation"""
         mock_exists.return_value = False
-        mock_run.return_value = MagicMock(returncode=0, stdout="wegent_git_cache_user_123")
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="wegent_git_cache_user_123"
+        )
 
         success, error = create_user_volume(123)
 
@@ -55,8 +51,8 @@ class TestVolumeManager:
         # Verify labels are included
         call_args = mock_run.call_args[0][0]
         assert "wegent.user-id=123" in call_args
-        assert "wegent.created-at=" in call_args
-        assert "wegent.last-used=" in call_args
+        assert any("wegent.created-at=" in arg for arg in call_args)
+        assert any("wegent.last-used=" in arg for arg in call_args)
 
     @patch("executor_manager.executors.docker.git_cache_volume_manager.volume_exists")
     @patch("executor_manager.executors.docker.git_cache_volume_manager.subprocess.run")
@@ -75,7 +71,9 @@ class TestVolumeManager:
     def test_create_user_volume_failure(self, mock_run, mock_exists):
         """Test volume creation failure"""
         mock_exists.return_value = False
-        mock_run.side_effect = subprocess.CalledProcessError(1, "cmd", stderr="Error creating volume")
+        mock_run.side_effect = subprocess.CalledProcessError(
+            1, "cmd", stderr="Error creating volume"
+        )
 
         success, error = create_user_volume(123)
 
@@ -105,11 +103,17 @@ class TestVolumeManager:
 
         assert metadata is None
 
-    @patch("executor_manager.executors.docker.git_cache_volume_manager.get_volume_metadata")
+    @patch(
+        "executor_manager.executors.docker.git_cache_volume_manager.get_volume_metadata"
+    )
     @patch("executor_manager.executors.docker.git_cache_volume_manager.subprocess.run")
     def test_update_volume_last_used_success(self, mock_run, mock_metadata):
         """Test updating volume last-used timestamp"""
-        mock_metadata.return_value = {"wegent.user-id": "123", "wegent.created-at": "2025-01-03T10:00:00", "wegent.last-used": "2025-01-03T10:00:00"}
+        mock_metadata.return_value = {
+            "wegent.user-id": "123",
+            "wegent.created-at": "2025-01-03T10:00:00",
+            "wegent.last-used": "2025-01-03T10:00:00",
+        }
         mock_run.return_value = MagicMock(returncode=0)
 
         result = update_volume_last_used("wegent_git_cache_user_123")
@@ -117,7 +121,9 @@ class TestVolumeManager:
         assert result is True
         mock_run.assert_called_once()
 
-    @patch("executor_manager.executors.docker.git_cache_volume_manager.get_volume_metadata")
+    @patch(
+        "executor_manager.executors.docker.git_cache_volume_manager.get_volume_metadata"
+    )
     def test_update_volume_last_used_not_found(self, mock_metadata):
         """Test updating metadata when volume doesn't exist"""
         mock_metadata.return_value = None
@@ -139,21 +145,36 @@ class TestVolumeManager:
     @patch("executor_manager.executors.docker.git_cache_volume_manager.subprocess.run")
     def test_delete_volume_failure(self, mock_run):
         """Test volume deletion failure"""
-        mock_run.side_effect = subprocess.CalledProcessError(1, "cmd", stderr="Error deleting volume")
+        mock_run.side_effect = subprocess.CalledProcessError(
+            1, "cmd", stderr="Error deleting volume"
+        )
 
         success, error = delete_volume("wegent_git_cache_user_123")
 
         assert success is False
         assert "Error deleting volume" in error
 
-    @patch("executor_manager.executors.docker.git_cache_volume_manager.get_volume_metadata")
+    @patch(
+        "executor_manager.executors.docker.git_cache_volume_manager.get_volume_metadata"
+    )
     @patch("executor_manager.executors.docker.git_cache_volume_manager.subprocess.run")
     def test_list_user_volumes(self, mock_run, mock_metadata):
         """Test listing user volumes"""
-        mock_run.return_value = MagicMock(returncode=0, stdout="wegent_git_cache_user_123\nwegent_git_cache_user_456\nother_volume\n")
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="wegent_git_cache_user_123\nwegent_git_cache_user_456\nother_volume\n",
+        )
         mock_metadata.side_effect = [
-            {"wegent.user-id": "123", "wegent.created-at": "2025-01-03T10:00:00", "wegent.last-used": "2025-01-03T15:30:00"},
-            {"wegent.user-id": "456", "wegent.created-at": "2025-01-02T10:00:00", "wegent.last-used": "2025-01-02T15:30:00"},
+            {
+                "wegent.user-id": "123",
+                "wegent.created-at": "2025-01-03T10:00:00",
+                "wegent.last-used": "2025-01-03T15:30:00",
+            },
+            {
+                "wegent.user-id": "456",
+                "wegent.created-at": "2025-01-02T10:00:00",
+                "wegent.last-used": "2025-01-02T15:30:00",
+            },
             None,
         ]
 
@@ -186,7 +207,10 @@ class TestVolumeManager:
     @patch("executor_manager.executors.docker.git_cache_volume_manager.subprocess.run")
     def test_get_all_user_volume_names(self, mock_run):
         """Test getting all user volume names"""
-        mock_run.return_value = MagicMock(returncode=0, stdout="wegent_git_cache_user_123\nwegent_git_cache_user_456\nother_volume\n")
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="wegent_git_cache_user_123\nwegent_git_cache_user_456\nother_volume\n",
+        )
 
         names = get_all_user_volume_names()
 
@@ -198,7 +222,9 @@ class TestVolumeManager:
     @patch("executor_manager.executors.docker.git_cache_volume_manager.subprocess.run")
     def test_get_all_user_volume_names_empty(self, mock_run):
         """Test getting all user volume names when none exist"""
-        mock_run.return_value = MagicMock(returncode=0, stdout="other_volume\nanother_volume\n")
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="other_volume\nanother_volume\n"
+        )
 
         names = get_all_user_volume_names()
 
